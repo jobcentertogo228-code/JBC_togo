@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # JOB-CENTER — Authentification
 
 ## Installation
@@ -117,3 +118,6 @@ Vérifiez les conditions d’utilisation du plan Vercel choisi : le plan Hobby e
 5. Vérifiez dans le Dashboard Supabase que RLS est activé pour les tables métier, que `candidate-resumes` est privé et que la publication `supabase_realtime` contient `notifications`. Les migrations présentes dans le dépôt décrivent ces réglages; elles ne certifient pas à elles seules l’état actuel d’un autre projet Supabase.
 
 La configuration Supabase locale utilise actuellement `http://localhost:3000`. Son Site URL et ses Redirect URLs doivent être remplacés/complétés pour la production; ne modifiez pas `.env.local` pour publier des secrets dans Git.
+=======
+# JBC_togo
+>>>>>>> b09620c8371bb1ca7e86e8ed56ea4879df802c8e
