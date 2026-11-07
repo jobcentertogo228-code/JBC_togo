@@ -1,14 +1,18 @@
 export default async function AuthErrorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; message?: string }>;
 }) {
-  const { type } = await searchParams;
-  const message = type === "profile"
+  const { type, message: callbackMessage } = await searchParams;
+  const message = type === "callback" && callbackMessage?.trim()
+    ? callbackMessage.trim().slice(0, 500)
+    : type === "profile"
     ? "Le profil associé à ce compte est indisponible. Vérifiez le déclencheur de création des profils dans Supabase."
     : type === "membership"
       ? "L’appartenance à l’entreprise n’a pas pu être vérifiée. Réessayez ou contactez l’assistance."
-      : "La session n’a pas pu être vérifiée. Reconnectez-vous.";
+      : type === "callback"
+        ? "Le lien de confirmation est invalide ou a expiré. Demandez un nouveau lien."
+        : "La session n’a pas pu être vérifiée. Reconnectez-vous.";
 
   return (
     <main className="page-shell main-content">

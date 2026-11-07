@@ -32,6 +32,7 @@ import {
   getCandidateSkillNames,
   getRecommendedJobs,
 } from "@/lib/candidate/queries";
+import { getCandidateAvatarUrl } from "@/lib/candidate/avatar";
 import { getSavedJobIds, getSavedJobListings } from "@/lib/jobs/queries";
 import { requireRole } from "@/lib/auth/roles";
 import type { ApplicationStatus } from "@/types/database";
@@ -166,7 +167,7 @@ export async function CandidateDashboard() {
   const interviewCount = applications.filter((application) => application.status === "interview").length;
   const unreadCount = unreadResult.count ?? 0;
   const greetingName = candidate?.display_name || profile.full_name.split(" ")[0] || "Candidat";
-  const avatarUrl = candidate?.photo_url?.startsWith("https://") ? candidate.photo_url : null;
+  const avatarUrl = await getCandidateAvatarUrl(supabase, user.id, candidate?.photo_url ?? null);
   const statusCounts = applicationStatuses
     .map((status) => ({
       label: statusLabels[status],

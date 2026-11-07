@@ -1,6 +1,9 @@
 export type AccountRole = "admin" | "company" | "candidate";
 export type CandidateVisibility = "private" | "companies_only" | "public";
 export type JobStatus = "draft" | "published" | "paused" | "closed" | "archived";
+export type CandidateCurrentStatus = "employed" | "unemployed" | "student" | "freelance" | "other";
+export type CandidateAvailability = "immediate" | "two_weeks" | "one_month" | "three_months" | "negotiable";
+export type LanguageProficiency = "basic" | "conversational" | "professional" | "native";
 export type EducationLevel =
   | "none"
   | "primary"
@@ -70,12 +73,20 @@ export type Database = {
       candidates: Table<
         {
           profile_id: string;
+          candidate_code: string;
+          first_name: string | null;
+          last_name: string | null;
           display_name: string | null;
           photo_url: string | null;
           headline: string | null;
           summary: string | null;
+          address: string | null;
           city: string | null;
           country_code: string;
+          birth_date: string | null;
+          nationality: string | null;
+          current_status: CandidateCurrentStatus | null;
+          availability: CandidateAvailability | null;
           visibility: CandidateVisibility;
           years_experience: number | null;
           desired_salary_min: number | null;
@@ -87,12 +98,20 @@ export type Database = {
         },
         {
           profile_id: string;
+          candidate_code?: string;
+          first_name?: string | null;
+          last_name?: string | null;
           display_name?: string | null;
           photo_url?: string | null;
           headline?: string | null;
           summary?: string | null;
+          address?: string | null;
           city?: string | null;
           country_code?: string;
+          birth_date?: string | null;
+          nationality?: string | null;
+          current_status?: CandidateCurrentStatus | null;
+          availability?: CandidateAvailability | null;
           visibility?: CandidateVisibility;
           years_experience?: number | null;
           desired_salary_min?: number | null;
@@ -103,6 +122,7 @@ export type Database = {
       companies: Table<
         {
           id: string;
+          company_code: string;
           owner_id: string;
           name: string;
           slug: string;
@@ -110,6 +130,9 @@ export type Database = {
           website_url: string | null;
           industry: string | null;
           company_size: string | null;
+          email: string | null;
+          phone: string | null;
+          address: string | null;
           city: string | null;
           country_code: string;
           logo_path: string | null;
@@ -119,6 +142,7 @@ export type Database = {
         },
         {
           id?: string;
+          company_code?: string;
           owner_id: string;
           name: string;
           slug: string;
@@ -126,6 +150,9 @@ export type Database = {
           website_url?: string | null;
           industry?: string | null;
           company_size?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          address?: string | null;
           city?: string | null;
           country_code?: string;
           logo_path?: string | null;
@@ -135,6 +162,7 @@ export type Database = {
       jobs: Table<
         {
           id: string;
+          reference_code: string;
           company_id: string;
           created_by: string;
           title: string;
@@ -163,6 +191,7 @@ export type Database = {
         },
         {
           id?: string;
+          reference_code?: string;
           company_id: string;
           created_by: string;
           title: string;
@@ -220,6 +249,7 @@ export type Database = {
           size_bytes: number;
           is_default: boolean;
           created_at: string;
+          updated_at: string;
         },
         {
           id?: string;
@@ -229,6 +259,7 @@ export type Database = {
           mime_type: string;
           size_bytes: number;
           is_default?: boolean;
+          updated_at?: string;
         }
       >;
       notifications: Table<
@@ -315,6 +346,22 @@ export type Database = {
           description?: string | null;
         }
       >;
+      candidate_languages: Table<
+        {
+          id: string;
+          candidate_id: string;
+          language: string;
+          proficiency: LanguageProficiency;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          candidate_id: string;
+          language: string;
+          proficiency: LanguageProficiency;
+        }
+      >;
       education: Table<
         {
           id: string;
@@ -346,6 +393,20 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      company_recruitment_stats: {
+        Args: { p_company_id: string };
+        Returns: Array<{
+          total_jobs: number;
+          open_jobs: number;
+          total_applications: number;
+          interviews: number;
+          hires: number;
+        }>;
+      };
+      company_application_monthly_activity: {
+        Args: { p_company_id: string };
+        Returns: Array<{ month_start: string; application_count: number }>;
+      };
       create_company: {
         Args: { p_name: string; p_slug: string };
         Returns: string;
@@ -356,6 +417,10 @@ export type Database = {
       };
       replace_candidate_skills: {
         Args: { p_skill_ids: string[] };
+        Returns: undefined;
+      };
+      replace_candidate_skills_with_proficiency: {
+        Args: { p_proficiency_by_skill: Record<string, number>; p_skill_ids: string[] };
         Returns: undefined;
       };
       set_candidate_default_resume: {

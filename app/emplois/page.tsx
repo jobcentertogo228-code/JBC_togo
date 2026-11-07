@@ -149,6 +149,8 @@ function pageHref(filters: ReturnType<typeof parseJobSearchFilters>, page: numbe
   if (filters.contract) params.set("contract", filters.contract);
   if (filters.experience) params.set("experience", filters.experience);
   if (filters.minSalary !== null) params.set("minSalary", filters.minSalary.toString());
+  if (filters.postedWithin) params.set("postedWithin", filters.postedWithin);
+  if (filters.sort !== "newest") params.set("sort", filters.sort);
   params.set("page", page.toString());
   return `/emplois?${params.toString()}`;
 }

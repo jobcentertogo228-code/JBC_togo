@@ -13,6 +13,8 @@ export type JobSearchFilters = {
   contract: EmploymentType | "";
   experience: ExperienceLevel | "";
   minSalary: number | null;
+  postedWithin: "day" | "week" | "month" | "";
+  sort: "newest" | "salary_desc" | "salary_asc";
   page: number;
 };
 
@@ -57,6 +59,8 @@ const experienceLevels: ExperienceLevel[] = [
   "senior",
   "executive",
 ];
+const postedWithinOptions = ["day", "week", "month"] as const;
+const sortOptions = ["newest", "salary_desc", "salary_asc"] as const;
 
 export function parseJobSearchFilters(searchParams: Record<string, string | string[] | undefined>): JobSearchFilters {
   const value = (key: string) => {
@@ -65,6 +69,8 @@ export function parseJobSearchFilters(searchParams: Record<string, string | stri
   };
   const contractValue = value("contract");
   const experienceValue = value("experience");
+  const postedWithinValue = value("postedWithin");
+  const sortValue = value("sort");
   const minSalaryValue = Number(value("minSalary"));
   const pageValue = Number(value("page"));
 
@@ -81,6 +87,12 @@ export function parseJobSearchFilters(searchParams: Record<string, string | stri
     minSalary: Number.isSafeInteger(minSalaryValue) && minSalaryValue > 0 && minSalaryValue <= 100_000_000
       ? minSalaryValue
       : null,
+    postedWithin: postedWithinOptions.includes(postedWithinValue as (typeof postedWithinOptions)[number])
+      ? postedWithinValue as (typeof postedWithinOptions)[number]
+      : "",
+    sort: sortOptions.includes(sortValue as (typeof sortOptions)[number])
+      ? sortValue as (typeof sortOptions)[number]
+      : "newest",
     page: Number.isSafeInteger(pageValue) && pageValue > 0 && pageValue <= 100_000
       ? pageValue
       : 1,
@@ -173,8 +185,19 @@ export async function searchPublishedJobs(supabase: JobsClient, filters: JobSear
       "id, company_id, title, slug, summary, domain, city, country_code, employment_type, workplace_type, salary_min, salary_max, salary_currency, experience_level, experience_min_years, published_at",
       { count: "exact" },
     )
-    .eq("status", "published")
-    .order("published_at", { ascending: false, nullsFirst: false });
+    .eq("status", "published");
+
+  if (filters.sort === "salary_desc") {
+    query = query
+      .order("salary_max", { ascending: false, nullsFirst: false })
+      .order("published_at", { ascending: false, nullsFirst: false });
+  } else if (filters.sort === "salary_asc") {
+    query = query
+      .order("salary_min", { ascending: true, nullsFirst: false })
+      .order("published_at", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("published_at", { ascending: false, nullsFirst: false });
+  }
 
   if (filters.q) {
     query = query.textSearch("search_document", filters.q, { config: "simple", type: "websearch" });
@@ -188,6 +211,10 @@ export async function searchPublishedJobs(supabase: JobsClient, filters: JobSear
       .eq("salary_currency", "XOF")
       .not("salary_max", "is", null)
       .gte("salary_max", filters.minSalary);
+  }
+  if (filters.postedWithin) {
+    const days = filters.postedWithin === "day" ? 1 : filters.postedWithin === "week" ? 7 : 30;
+    query = query.gte("published_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
   }
 
   const from = (filters.page - 1) * pageSize;

@@ -13,14 +13,45 @@ export type CandidateActionState = {
 };
 
 const profileSchema = z.object({
-  fullName: z.string().trim().min(2, "Saisissez votre nom complet.").max(120),
+  firstName: z.string().trim().min(1, "Saisissez votre prénom.").max(80),
+  lastName: z.string().trim().min(1, "Saisissez votre nom.").max(80),
   phone: z.string().trim().max(40).optional(),
   displayName: z.string().trim().max(120).optional(),
   headline: z.string().trim().max(160).optional(),
   summary: z.string().trim().max(10000).optional(),
+  address: z.string().trim().max(240).optional(),
   city: z.string().trim().max(120).optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+  birthDate: z.string().optional(),
+  nationality: z.string().trim().max(80).optional(),
+  currentStatus: z.union([
+    z.literal(""),
+    z.enum(["employed", "unemployed", "student", "freelance", "other"]),
+  ]).optional(),
+  availability: z.union([
+    z.literal(""),
+    z.enum(["immediate", "two_weeks", "one_month", "three_months", "negotiable"]),
+  ]).optional(),
   yearsExperience: z.string().optional(),
-});
+  desiredSalaryMin: z.string().optional(),
+  desiredSalaryMax: z.string().optional(),
+}).refine(
+  (value) => !value.birthDate || (
+    /^\d{4}-\d{2}-\d{2}$/.test(value.birthDate)
+    && !Number.isNaN(Date.parse(`${value.birthDate}T00:00:00.000Z`))
+    && new Date(`${value.birthDate}T00:00:00.000Z`) <= new Date()
+  ),
+  { path: ["birthDate"], message: "Saisissez une date de naissance valide." },
+).refine(
+  (value) => {
+    const min = value.desiredSalaryMin?.trim() ? Number(value.desiredSalaryMin) : null;
+    const max = value.desiredSalaryMax?.trim() ? Number(value.desiredSalaryMax) : null;
+    return (min === null || (Number.isFinite(min) && min >= 0 && min <= 9_999_999_999))
+      && (max === null || (Number.isFinite(max) && max >= 0 && max <= 9_999_999_999))
+      && (min === null || max === null || min <= max);
+  },
+  { path: ["desiredSalaryMax"], message: "Vérifiez les montants de salaire souhaités." },
+);
 
 const visibilitySchema = z.object({
   visibility: z.enum(["private", "companies_only", "public"]),
@@ -28,6 +59,7 @@ const visibilitySchema = z.object({
 
 const skillsSchema = z.object({
   skillIds: z.array(z.string().uuid()).max(30, "Vous pouvez sélectionner au maximum 30 compétences."),
+  skillProficiencies: z.array(z.string().regex(/^[0-9a-f-]{36}:[1-5]$/i)).max(30),
 });
 
 const passwordSchema = z.object({
@@ -37,6 +69,50 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
   message: "Les mots de passe ne correspondent pas.",
 });
+
+const languageSchema = z.object({
+  languageId: z.string().uuid().optional().or(z.literal("")),
+  language: z.string().trim().min(2).max(80),
+  proficiency: z.enum(["basic", "conversational", "professional", "native"]),
+});
+
+const educationSchema = z.object({
+  educationId: z.string().uuid().optional().or(z.literal("")),
+  institution: z.string().trim().min(1).max(180),
+  qualification: z.string().trim().max(180).optional(),
+  fieldOfStudy: z.string().trim().max(180).optional(),
+  startYear: z.string().optional(),
+  endYear: z.string().optional(),
+  description: z.string().trim().max(5000).optional(),
+}).refine(
+  (value) => {
+    const start = value.startYear?.trim() ? Number(value.startYear) : null;
+    const end = value.endYear?.trim() ? Number(value.endYear) : null;
+    const currentYear = new Date().getFullYear();
+    return [start, end].every((year) => year === null || (Number.isInteger(year) && year >= 1950 && year <= currentYear + 5))
+      && (start === null || end === null || end >= start);
+  },
+  { path: ["endYear"], message: "Vérifiez les années de formation." },
+);
+
+const experienceSchema = z.object({
+  experienceId: z.string().uuid().optional().or(z.literal("")),
+  employer: z.string().trim().min(1).max(180),
+  jobTitle: z.string().trim().min(1).max(180),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  isCurrent: z.string().optional(),
+  description: z.string().trim().max(8000).optional(),
+}).refine(
+  (value) => {
+    const start = value.startDate?.trim() || null;
+    const end = value.isCurrent === "on" ? null : value.endDate?.trim() || null;
+    return (!start || /^\d{4}-\d{2}-\d{2}$/.test(start))
+      && (!end || /^\d{4}-\d{2}-\d{2}$/.test(end))
+      && (!start || !end || end >= start);
+  },
+  { path: ["endDate"], message: "Vérifiez les dates de cette expérience." },
+);
 
 function formValues(formData: FormData) {
   return Object.fromEntries(
@@ -56,8 +132,15 @@ export async function saveCandidateProfileAction(
   if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const { supabase, user } = await requireRole("candidate");
+  const fullName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
   const yearsExperience = parsed.data.yearsExperience?.trim()
     ? Number(parsed.data.yearsExperience)
+    : null;
+  const desiredSalaryMin = parsed.data.desiredSalaryMin?.trim()
+    ? Number(parsed.data.desiredSalaryMin)
+    : null;
+  const desiredSalaryMax = parsed.data.desiredSalaryMax?.trim()
+    ? Number(parsed.data.desiredSalaryMax)
     : null;
 
   if (yearsExperience !== null && (!Number.isFinite(yearsExperience) || yearsExperience < 0 || yearsExperience > 80)) {
@@ -67,8 +150,8 @@ export async function saveCandidateProfileAction(
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
-      full_name: parsed.data.fullName,
-      phone: parsed.data.phone || null,
+      full_name: fullName.slice(0, 120),
+      phone: parsed.data.phone?.trim() || null,
     })
     .eq("id", user.id);
 
@@ -79,11 +162,21 @@ export async function saveCandidateProfileAction(
     .upsert(
       {
         profile_id: user.id,
-        display_name: parsed.data.displayName?.trim() || parsed.data.fullName,
+        first_name: parsed.data.firstName,
+        last_name: parsed.data.lastName,
+        display_name: parsed.data.displayName?.trim() || fullName,
         headline: parsed.data.headline?.trim() || null,
         summary: parsed.data.summary?.trim() || null,
+        address: parsed.data.address?.trim() || null,
         city: parsed.data.city?.trim() || null,
+        country_code: parsed.data.countryCode || "TG",
+        birth_date: parsed.data.birthDate?.trim() || null,
+        nationality: parsed.data.nationality?.trim() || null,
+        current_status: parsed.data.currentStatus || null,
+        availability: parsed.data.availability || null,
         years_experience: yearsExperience,
+        desired_salary_min: desiredSalaryMin,
+        desired_salary_max: desiredSalaryMax,
       },
       { onConflict: "profile_id" },
     );
@@ -92,7 +185,169 @@ export async function saveCandidateProfileAction(
 
   revalidatePath("/candidate");
   revalidatePath("/candidate/profil");
+  revalidatePath("/company/candidats");
   return { message: "Votre profil a été mis à jour." };
+}
+
+export async function saveCandidateLanguageAction(
+  _previousState: CandidateActionState,
+  formData: FormData,
+): Promise<CandidateActionState> {
+  const parsed = languageSchema.safeParse({
+    languageId: formData.get("languageId") ?? "",
+    language: formData.get("language"),
+    proficiency: formData.get("proficiency"),
+  });
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const { supabase, user } = await requireRole("candidate");
+  const values = { language: parsed.data.language, proficiency: parsed.data.proficiency };
+  const query = parsed.data.languageId
+    ? supabase.from("candidate_languages").update(values).eq("id", parsed.data.languageId).eq("candidate_id", user.id)
+    : supabase.from("candidate_languages").insert({ ...values, candidate_id: user.id });
+  const { error } = await query;
+  if (error) {
+    console.error("Unable to save candidate language:", error);
+    return { error: error.code === "23505" ? "Cette langue figure déjà dans votre profil." : "La langue n’a pas pu être enregistrée." };
+  }
+
+  revalidatePath("/candidate/profil");
+  return { message: "La langue a été enregistrée." };
+}
+
+export async function deleteCandidateLanguageAction(
+  _previousState: CandidateActionState,
+  formData: FormData,
+): Promise<CandidateActionState> {
+  const languageId = z.string().uuid().safeParse(formData.get("languageId"));
+  if (!languageId.success) return { error: "Cette langue est invalide." };
+
+  const { supabase, user } = await requireRole("candidate");
+  const { error } = await supabase
+    .from("candidate_languages")
+    .delete()
+    .eq("id", languageId.data)
+    .eq("candidate_id", user.id);
+  if (error) {
+    console.error("Unable to delete candidate language:", error);
+    return { error: "La langue n’a pas pu être supprimée." };
+  }
+
+  revalidatePath("/candidate/profil");
+  return { message: "La langue a été supprimée." };
+}
+
+export async function saveCandidateEducationAction(
+  _previousState: CandidateActionState,
+  formData: FormData,
+): Promise<CandidateActionState> {
+  const parsed = educationSchema.safeParse({
+    educationId: formData.get("educationId") ?? "",
+    institution: formData.get("institution"),
+    qualification: formData.get("qualification") ?? "",
+    fieldOfStudy: formData.get("fieldOfStudy") ?? "",
+    startYear: formData.get("startYear") ?? "",
+    endYear: formData.get("endYear") ?? "",
+    description: formData.get("description") ?? "",
+  });
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const { supabase, user } = await requireRole("candidate");
+  const startYear = parsed.data.startYear?.trim();
+  const endYear = parsed.data.endYear?.trim();
+  const values = {
+    institution: parsed.data.institution,
+    qualification: parsed.data.qualification?.trim() || null,
+    field_of_study: parsed.data.fieldOfStudy?.trim() || null,
+    start_date: startYear ? `${startYear}-01-01` : null,
+    end_date: endYear ? `${endYear}-12-31` : null,
+    description: parsed.data.description?.trim() || null,
+  };
+  const query = parsed.data.educationId
+    ? supabase.from("education").update(values).eq("id", parsed.data.educationId).eq("candidate_id", user.id)
+    : supabase.from("education").insert({ ...values, candidate_id: user.id });
+  const { error } = await query;
+  if (error) {
+    console.error("Unable to save candidate education:", error);
+    return { error: "La formation n’a pas pu être enregistrée." };
+  }
+
+  revalidatePath("/candidate/profil");
+  return { message: "La formation a été enregistrée." };
+}
+
+export async function deleteCandidateEducationAction(
+  _previousState: CandidateActionState,
+  formData: FormData,
+): Promise<CandidateActionState> {
+  const educationId = z.string().uuid().safeParse(formData.get("educationId"));
+  if (!educationId.success) return { error: "Cette formation est invalide." };
+
+  const { supabase, user } = await requireRole("candidate");
+  const { error } = await supabase.from("education").delete().eq("id", educationId.data).eq("candidate_id", user.id);
+  if (error) {
+    console.error("Unable to delete candidate education:", error);
+    return { error: "La formation n’a pas pu être supprimée." };
+  }
+
+  revalidatePath("/candidate/profil");
+  return { message: "La formation a été supprimée." };
+}
+
+export async function saveCandidateExperienceAction(
+  _previousState: CandidateActionState,
+  formData: FormData,
+): Promise<CandidateActionState> {
+  const parsed = experienceSchema.safeParse({
+    experienceId: formData.get("experienceId") ?? "",
+    employer: formData.get("employer"),
+    jobTitle: formData.get("jobTitle"),
+    startDate: formData.get("startDate") ?? "",
+    endDate: formData.get("endDate") ?? "",
+    isCurrent: formData.get("isCurrent") ?? "",
+    description: formData.get("description") ?? "",
+  });
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const { supabase, user } = await requireRole("candidate");
+  const isCurrent = parsed.data.isCurrent === "on";
+  const values = {
+    employer: parsed.data.employer,
+    job_title: parsed.data.jobTitle,
+    start_date: parsed.data.startDate?.trim() || null,
+    end_date: isCurrent ? null : parsed.data.endDate?.trim() || null,
+    is_current: isCurrent,
+    description: parsed.data.description?.trim() || null,
+  };
+  const query = parsed.data.experienceId
+    ? supabase.from("experiences").update(values).eq("id", parsed.data.experienceId).eq("candidate_id", user.id)
+    : supabase.from("experiences").insert({ ...values, candidate_id: user.id });
+  const { error } = await query;
+  if (error) {
+    console.error("Unable to save candidate experience:", error);
+    return { error: "L’expérience n’a pas pu être enregistrée." };
+  }
+
+  revalidatePath("/candidate/profil");
+  return { message: "L’expérience a été enregistrée." };
+}
+
+export async function deleteCandidateExperienceAction(
+  _previousState: CandidateActionState,
+  formData: FormData,
+): Promise<CandidateActionState> {
+  const experienceId = z.string().uuid().safeParse(formData.get("experienceId"));
+  if (!experienceId.success) return { error: "Cette expérience est invalide." };
+
+  const { supabase, user } = await requireRole("candidate");
+  const { error } = await supabase.from("experiences").delete().eq("id", experienceId.data).eq("candidate_id", user.id);
+  if (error) {
+    console.error("Unable to delete candidate experience:", error);
+    return { error: "L’expérience n’a pas pu être supprimée." };
+  }
+
+  revalidatePath("/candidate/profil");
+  return { message: "L’expérience a été supprimée." };
 }
 
 export async function saveCandidateVisibilityAction(
@@ -123,15 +378,39 @@ export async function saveCandidateSkillsAction(
 ): Promise<CandidateActionState> {
   const parsed = skillsSchema.safeParse({
     skillIds: formData.getAll("skillIds").map(String),
+    skillProficiencies: formData.getAll("skillProficiencies").map(String),
   });
   if (!parsed.success) return { error: firstIssue(parsed.error) };
 
+  const proficiencyBySkill = new Map(
+    parsed.data.skillProficiencies.map((entry) => {
+      const separator = entry.lastIndexOf(":");
+      return [entry.slice(0, separator), Number(entry.slice(separator + 1))] as const;
+    }),
+  );
+  if (
+    new Set(parsed.data.skillIds).size !== parsed.data.skillIds.length
+    || parsed.data.skillIds.some((skillId) => !proficiencyBySkill.has(skillId))
+  ) {
+    return { error: "Sélectionnez un niveau pour chaque compétence choisie." };
+  }
+  const proficiencyValues: Record<string, number> = {};
+  for (const skillId of parsed.data.skillIds) {
+    const proficiency = proficiencyBySkill.get(skillId);
+    if (proficiency === undefined) return { error: "Sélectionnez un niveau pour chaque compétence choisie." };
+    proficiencyValues[skillId] = proficiency;
+  }
+
   const { supabase } = await requireRole("candidate");
-  const { error } = await supabase.rpc("replace_candidate_skills", {
+  const { error } = await supabase.rpc("replace_candidate_skills_with_proficiency", {
     p_skill_ids: parsed.data.skillIds,
+    p_proficiency_by_skill: proficiencyValues,
   });
 
-  if (error) return { error: "Les compétences n’ont pas pu être enregistrées." };
+  if (error) {
+    console.error("Unable to save candidate skills:", error);
+    return { error: "Les compétences n’ont pas pu être enregistrées." };
+  }
   revalidatePath("/candidate");
   revalidatePath("/candidate/profil");
   return { message: "Vos compétences ont été mises à jour." };

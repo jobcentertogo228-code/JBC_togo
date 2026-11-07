@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Download, FileText, Star } from "lucide-react";
 import { DefaultResumeForm } from "@/components/candidate/default-resume-form";
 import { ResumeDeleteForm } from "@/components/candidate/resume-delete-form";
+import { ResumeReplace } from "@/components/candidate/resume-replace";
 import { ResumeUpload } from "@/components/candidate/resume-upload";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ export default async function CandidateResumesPage() {
   const { supabase, user } = await requireRole("candidate");
   const { data: resumes, error } = await supabase
     .from("resumes")
-    .select("id, title, storage_path, size_bytes, is_default, created_at")
+    .select("id, title, storage_path, mime_type, size_bytes, is_default, created_at, updated_at")
     .eq("candidate_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -63,10 +64,12 @@ export default async function CandidateResumesPage() {
                     <p className="truncate font-semibold">{resume.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {(resume.size_bytes / 1024 / 1024).toFixed(1)} Mo · Ajouté le {formatDate(resume.created_at)}
+                      {resume.updated_at > resume.created_at ? ` · Remplacé le ${formatDate(resume.updated_at)}` : ""}
                     </p>
                   </div>
                   {resume.is_default && <Badge className="hidden sm:inline-flex" variant="success"><Star className="mr-1 h-3 w-3" />CV principal</Badge>}
                   {!resume.is_default && <DefaultResumeForm resumeId={resume.id} />}
+                  <ResumeReplace candidateId={user.id} oldStoragePath={resume.storage_path} resumeId={resume.id} />
                   <a
                     aria-label={`Télécharger ${resume.title}`}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-primary"
@@ -77,6 +80,21 @@ export default async function CandidateResumesPage() {
                     <Download aria-hidden="true" className="h-4 w-4" />
                   </a>
                   <ResumeDeleteForm resumeId={resume.id} />
+                  {resume.mime_type === "application/pdf" && (
+                    <details className="basis-full rounded-lg border border-border p-3">
+                      <summary className="cursor-pointer text-sm font-medium">Prévisualiser le PDF</summary>
+                      <object
+                        aria-label={`Aperçu de ${resume.title}`}
+                        className="mt-3 h-[min(70vh,700px)] w-full rounded-md border border-border"
+                        data={resume.signedUrl}
+                        type="application/pdf"
+                      >
+                        <p className="p-3 text-sm text-muted-foreground">
+                          L’aperçu n’est pas disponible dans ce navigateur. Utilisez le lien de téléchargement.
+                        </p>
+                      </object>
+                    </details>
+                  )}
                 </div>
               ))}
             </div>

@@ -7,11 +7,13 @@ export function ProtectedShell({
   title,
   home,
   notificationHref,
+  navigationLinks = [],
 }: {
   children: React.ReactNode;
   title: string;
   home: string;
   notificationHref?: string;
+  navigationLinks?: Array<{ href: string; label: string }>;
 }) {
   return (
     <div className="page-shell">
@@ -19,6 +21,11 @@ export function ProtectedShell({
         <Link className="brand" href={home}>JOB-CENTER</Link>
         <nav className="site-nav" aria-label="Navigation de l’espace">
           <span className="muted">{title}</span>
+          {navigationLinks.map((item) => (
+            <Link className="text-sm font-medium hover:text-primary" href={item.href} key={item.href}>
+              {item.label}
+            </Link>
+          ))}
           {notificationHref && <NotificationBell href={notificationHref} label="Notifications" />}
           <form action={signOutAction}>
             <button className="button button-secondary" type="submit">Déconnexion</button>

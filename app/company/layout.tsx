@@ -14,7 +14,17 @@ export default async function CompanyLayout({ children }: Readonly<{ children: R
 
   return (
     <NotificationRealtimeProvider initialUnreadCount={count ?? 0} userId={user.id}>
-      <ProtectedShell notificationHref="/company/notifications" title="Espace entreprise" home="/company">
+      <ProtectedShell
+        navigationLinks={[
+          { href: "/company/offres", label: "Offres" },
+          { href: "/company/candidatures", label: "Candidatures" },
+          { href: "/company/candidats", label: "Candidats" },
+          { href: "/company/profil", label: "Entreprise" },
+        ]}
+        notificationHref="/company/notifications"
+        title="Espace entreprise"
+        home="/company"
+      >
         {children}
       </ProtectedShell>
     </NotificationRealtimeProvider>

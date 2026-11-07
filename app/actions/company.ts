@@ -29,11 +29,29 @@ const optionalYears = z.union([
     .pipe(z.number().finite().min(0).max(80)),
 ]);
 
-const jobPublicationSchema = z.object({
+const companyProfileSchema = z.object({
+  companyId: z.string().uuid(),
+  name: z.string().trim().min(2).max(180),
+  industry: z.string().trim().max(120).optional(),
+  description: z.string().trim().max(10000).optional(),
+  phone: z.string().trim().max(40).optional(),
+  email: z.union([z.literal(""), z.string().trim().email().max(254)]).optional(),
+  websiteUrl: z.union([z.literal(""), z.string().trim().url().max(2048)]).optional(),
+  address: z.string().trim().max(240).optional(),
+  city: z.string().trim().max(120).optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+});
+
+const jobFieldsSchema = z.object({
   companyId: z.string().uuid("Sélectionnez une entreprise valide."),
   title: z.string().trim().min(3, "Le titre doit contenir au moins 3 caractères.").max(180),
   description: z.string().trim().min(20, "La description doit contenir au moins 20 caractères.").max(30000),
+  domain: z.string().trim().max(120).optional(),
+  requirements: z.string().trim().max(12000).optional(),
+  benefits: z.string().trim().max(8000).optional(),
   city: z.string().trim().min(2, "Saisissez une ville.").max(120),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+  workplaceType: z.enum(["onsite", "hybrid", "remote"]),
   salaryMin: optionalMoney,
   salaryMax: optionalMoney,
   employmentType: z.enum(["full_time", "part_time", "contract", "internship", "temporary"]),
@@ -58,7 +76,14 @@ const jobPublicationSchema = z.object({
       const parsed = new Date(`${date}T00:00:00.000Z`);
       return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
     }, "Saisissez une date limite valide."),
-}).refine(
+});
+
+const jobPublicationSchema = jobFieldsSchema.refine(
+  (values) => values.salaryMin === null || values.salaryMax === null || values.salaryMin <= values.salaryMax,
+  { path: ["salaryMax"], message: "Le salaire maximum doit être supérieur ou égal au minimum." },
+);
+
+const jobUpdateSchema = jobFieldsSchema.extend({ jobId: z.string().uuid() }).refine(
   (values) => values.salaryMin === null || values.salaryMax === null || values.salaryMin <= values.salaryMax,
   { path: ["salaryMax"], message: "Le salaire maximum doit être supérieur ou égal au minimum." },
 );
@@ -84,6 +109,70 @@ function slugify(value: string) {
     .replace(/-$/g, "");
 
   return `${base || "offre"}-${randomUUID().replace(/-/g, "").slice(0, 8)}`;
+}
+
+export async function saveCompanyProfileAction(
+  _previousState: CompanyActionState,
+  formData: FormData,
+): Promise<CompanyActionState> {
+  const parsed = companyProfileSchema.safeParse({
+    companyId: formData.get("companyId"),
+    name: formData.get("name"),
+    industry: formData.get("industry") ?? "",
+    description: formData.get("description") ?? "",
+    phone: formData.get("phone") ?? "",
+    email: formData.get("email") ?? "",
+    websiteUrl: formData.get("websiteUrl") ?? "",
+    address: formData.get("address") ?? "",
+    city: formData.get("city") ?? "",
+    countryCode: formData.get("countryCode"),
+  });
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const { supabase, user } = await requireRole("company");
+  const { data: membership, error: membershipError } = await supabase
+    .from("company_memberships")
+    .select("role")
+    .eq("company_id", parsed.data.companyId)
+    .eq("profile_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error("Unable to verify company profile manager:", membershipError);
+    return { error: "Impossible de vérifier vos droits sur cette entreprise." };
+  }
+  if (!membership || !["owner", "admin"].includes(membership.role)) {
+    return { error: "Seul un propriétaire ou administrateur peut modifier le profil de l’entreprise." };
+  }
+
+  const { data, error } = await supabase
+    .from("companies")
+    .update({
+      name: parsed.data.name,
+      industry: parsed.data.industry?.trim() || null,
+      description: parsed.data.description?.trim() || null,
+      phone: parsed.data.phone?.trim() || null,
+      email: parsed.data.email?.trim() || null,
+      website_url: parsed.data.websiteUrl?.trim() || null,
+      address: parsed.data.address?.trim() || null,
+      city: parsed.data.city?.trim() || null,
+      country_code: parsed.data.countryCode,
+    })
+    .eq("id", parsed.data.companyId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Unable to save company profile:", error);
+    return { error: "Le profil de l’entreprise n’a pas pu être enregistré." };
+  }
+  if (!data) return { error: "Vous n’avez pas l’autorisation de modifier cette entreprise." };
+
+  revalidatePath("/company");
+  revalidatePath("/company/profil");
+  revalidatePath("/emplois");
+  return { message: "Le profil de l’entreprise a été mis à jour." };
 }
 
 export async function publishJobAction(
@@ -128,10 +217,14 @@ export async function publishJobAction(
     title: parsed.data.title,
     slug,
     summary: parsed.data.description.replace(/\s+/g, " ").slice(0, 300),
+    domain: parsed.data.domain?.trim() || null,
     description: parsed.data.description,
+    requirements: parsed.data.requirements?.trim() || null,
+    benefits: parsed.data.benefits?.trim() || null,
     city: parsed.data.city,
-    country_code: "TG",
+    country_code: parsed.data.countryCode,
     employment_type: parsed.data.employmentType,
+    workplace_type: parsed.data.workplaceType,
     salary_min: parsed.data.salaryMin,
     salary_max: parsed.data.salaryMax,
     salary_currency: "XOF",
@@ -149,8 +242,174 @@ export async function publishJobAction(
   }
 
   revalidatePath("/company");
+  revalidatePath("/company/offres");
   revalidatePath("/emplois");
   redirect(`/emplois/${slug}`);
+}
+
+export async function updateCompanyJobAction(
+  _previousState: CompanyActionState,
+  formData: FormData,
+): Promise<CompanyActionState> {
+  const parsed = jobUpdateSchema.safeParse({
+    ...Object.fromEntries(
+      Array.from(formData.entries()).map(([key, value]) => [key, typeof value === "string" ? value : ""]),
+    ),
+  });
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const { supabase, user } = await requireRole("company");
+  const { data: membership, error: membershipError } = await supabase
+    .from("company_memberships")
+    .select("company_id, role")
+    .eq("company_id", parsed.data.companyId)
+    .eq("profile_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error("Unable to verify job editor membership:", membershipError);
+    return { error: "Impossible de vérifier vos droits sur cette offre." };
+  }
+  if (!membership || !["owner", "admin", "recruiter"].includes(membership.role)) {
+    return { error: "Vous n’avez pas les droits de modification pour cette offre." };
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .select("id, company_id, status")
+    .eq("id", parsed.data.jobId)
+    .eq("company_id", parsed.data.companyId)
+    .maybeSingle();
+  if (jobError) {
+    console.error("Unable to load job for editing:", jobError);
+    return { error: "Impossible de charger cette offre." };
+  }
+  if (!job) return { error: "Cette offre n’est pas disponible." };
+  if (["archived", "closed"].includes(job.status)) {
+    return { error: "Cette offre clôturée ne peut plus être modifiée." };
+  }
+
+  const closesAt = new Date(`${parsed.data.closesAt}T23:59:59.999Z`);
+  if (closesAt <= new Date()) return { error: "La date limite doit être aujourd’hui ou une date ultérieure." };
+
+  const { data: updated, error: updateError } = await supabase
+    .from("jobs")
+    .update({
+      title: parsed.data.title,
+      summary: parsed.data.description.replace(/\s+/g, " ").slice(0, 300),
+      domain: parsed.data.domain?.trim() || null,
+      description: parsed.data.description,
+      requirements: parsed.data.requirements?.trim() || null,
+      benefits: parsed.data.benefits?.trim() || null,
+      city: parsed.data.city,
+      country_code: parsed.data.countryCode,
+      employment_type: parsed.data.employmentType,
+      workplace_type: parsed.data.workplaceType,
+      salary_min: parsed.data.salaryMin,
+      salary_max: parsed.data.salaryMax,
+      experience_level: parsed.data.experienceLevel || null,
+      experience_min_years: parsed.data.experienceMinYears,
+      minimum_education_level: parsed.data.minimumEducationLevel,
+      closes_at: closesAt.toISOString(),
+    })
+    .eq("id", job.id)
+    .eq("company_id", membership.company_id)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    console.error("Unable to update job:", updateError);
+    return { error: "Les modifications de l’offre n’ont pas pu être enregistrées." };
+  }
+  if (!updated) return { error: "Cette offre n’est plus disponible." };
+
+  revalidatePath("/company");
+  revalidatePath("/company/offres");
+  revalidatePath(`/company/offres/${job.id}`);
+  revalidatePath("/emplois");
+  return { message: "L’offre a été mise à jour." };
+}
+
+export async function archiveCompanyJobAction(
+  _previousState: CompanyActionState,
+  formData: FormData,
+): Promise<CompanyActionState> {
+  const jobId = z.string().uuid().safeParse(formData.get("jobId"));
+  if (!jobId.success) return { error: "Cette offre est invalide." };
+
+  const { supabase, user } = await requireRole("company");
+  const { data: job, error: readError } = await supabase
+    .from("jobs")
+    .select("id, company_id, status")
+    .eq("id", jobId.data)
+    .maybeSingle();
+  if (readError) {
+    console.error("Unable to load job for archiving:", readError);
+    return { error: "Impossible de charger cette offre." };
+  }
+  if (!job) return { error: "Cette offre n’est pas disponible." };
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("company_memberships")
+    .select("role")
+    .eq("company_id", job.company_id)
+    .eq("profile_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (membershipError) {
+    console.error("Unable to verify job archive membership:", membershipError);
+    return { error: "Impossible de vérifier vos droits sur cette offre." };
+  }
+  if (!membership || !["owner", "admin", "recruiter"].includes(membership.role)) {
+    return { error: "Vous n’avez pas les droits nécessaires pour archiver cette offre." };
+  }
+  if (job.status === "archived") return { message: "Cette offre est déjà archivée." };
+
+  const { error: updateError } = await supabase
+    .from("jobs")
+    .update({ status: "archived" })
+    .eq("id", job.id)
+    .eq("company_id", job.company_id);
+  if (updateError) {
+    console.error("Unable to archive job:", updateError);
+    return { error: "L’offre n’a pas pu être archivée." };
+  }
+
+  revalidatePath("/company");
+  revalidatePath("/company/offres");
+  revalidatePath("/emplois");
+  return { message: "L’offre a été archivée." };
+}
+
+export async function deleteCompanyJobAction(
+  _previousState: CompanyActionState,
+  formData: FormData,
+): Promise<CompanyActionState> {
+  const jobId = z.string().uuid().safeParse(formData.get("jobId"));
+  if (!jobId.success) return { error: "Cette offre est invalide." };
+
+  const { supabase } = await requireRole("company");
+  const { data, error } = await supabase
+    .from("jobs")
+    .delete()
+    .eq("id", jobId.data)
+    .in("status", ["draft", "archived"])
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("Unable to delete job:", error);
+    return {
+      error: error.code === "23503"
+        ? "Cette offre possède des candidatures. Archivez-la pour conserver l’historique."
+        : "L’offre n’a pas pu être supprimée.",
+    };
+  }
+  if (!data) return { error: "Seules les offres brouillon ou archivées sans candidature peuvent être supprimées." };
+
+  revalidatePath("/company");
+  revalidatePath("/company/offres");
+  return { message: "L’offre a été supprimée." };
 }
 
 export async function markCompanyNotificationReadAction(

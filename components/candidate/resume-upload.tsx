@@ -8,11 +8,6 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 const maxFileSize = 10 * 1024 * 1024;
-const allowedTypes: Record<string, string> = {
-  pdf: "application/pdf",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-};
 
 export function ResumeUpload({ candidateId, hasDefault }: { candidateId: string; hasDefault: boolean }) {
   const router = useRouter();
@@ -30,14 +25,16 @@ export function ResumeUpload({ candidateId, hasDefault }: { candidateId: string;
       return;
     }
 
-    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const mimeType = allowedTypes[extension];
-    if (!mimeType || (file.type && file.type !== mimeType)) {
-      setMessage({ kind: "error", text: "Formats acceptés : PDF, DOC ou DOCX." });
+    if (!file.name.toLowerCase().endsWith(".pdf") || (file.type && file.type !== "application/pdf")) {
+      setMessage({ kind: "error", text: "Le CV doit être au format PDF." });
       return;
     }
     if (file.size === 0 || file.size > maxFileSize) {
       setMessage({ kind: "error", text: "Le fichier doit peser entre 1 octet et 10 Mo." });
+      return;
+    }
+    if (await file.slice(0, 5).text() !== "%PDF-") {
+      setMessage({ kind: "error", text: "Le fichier sélectionné ne semble pas être un PDF valide." });
       return;
     }
 
@@ -55,7 +52,7 @@ export function ResumeUpload({ candidateId, hasDefault }: { candidateId: string;
     const storagePath = `${candidateId}/${crypto.randomUUID()}/${safeName}`;
     const { error: uploadError } = await supabase.storage
       .from("candidate-resumes")
-      .upload(storagePath, file, { contentType: mimeType, upsert: false });
+      .upload(storagePath, file, { contentType: "application/pdf", upsert: false });
 
     if (uploadError) {
       setBusy(false);
@@ -65,9 +62,9 @@ export function ResumeUpload({ candidateId, hasDefault }: { candidateId: string;
 
     const { error: metadataError } = await supabase.from("resumes").insert({
       candidate_id: candidateId,
-      title: file.name,
+      title: file.name.slice(0, 160),
       storage_path: storagePath,
-      mime_type: mimeType,
+      mime_type: "application/pdf",
       size_bytes: file.size,
       is_default: !hasDefault,
     });
@@ -97,9 +94,9 @@ export function ResumeUpload({ candidateId, hasDefault }: { candidateId: string;
       <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted px-5 py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/10">
         <FileUp aria-hidden="true" className="mb-3 h-8 w-8 text-primary" />
         <span className="font-semibold">Choisir un fichier CV</span>
-        <span className="mt-1 text-sm text-muted-foreground">PDF, DOC ou DOCX · 10 Mo maximum</span>
+        <span className="mt-1 text-sm text-muted-foreground">PDF · 10 Mo maximum</span>
         <input
-          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept=".pdf,application/pdf"
           className="sr-only"
           ref={inputRef}
           type="file"

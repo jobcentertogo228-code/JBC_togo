@@ -109,15 +109,25 @@ export async function signUpCandidateAction(
   const next = safeNextPath(String(formData.get("next") ?? ""), "/candidate");
 
   const supabase = await createSupabaseActionClient();
+  const emailRedirectTo = `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+  console.log("[auth/signup:candidate] Redirection de confirmation configurée.", {
+    redirectTo: emailRedirectTo,
+    next,
+  });
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.fullName },
-      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+      emailRedirectTo,
     },
   });
 
+  console.log("[auth/signup:candidate] Résultat Supabase.", {
+    hasUser: Boolean(data.user),
+    hasSession: Boolean(data.session),
+    error: error ? { name: error.name, code: error.code, status: error.status, message: error.message } : null,
+  });
   if (error) return { error: publicAuthError(error.message) };
   if (!data.session) {
     return { message: "Vérifiez votre boîte e-mail pour confirmer votre compte avant de vous connecter." };
@@ -134,6 +144,11 @@ export async function signUpCompanyAction(
   if (!parsed.success) return { error: validationMessage(parsed.error) };
 
   const supabase = await createSupabaseActionClient();
+  const emailRedirectTo = `${getSiteUrl()}/auth/callback?next=%2Fcompany%2Fsetup`;
+  console.log("[auth/signup:company] Redirection de confirmation configurée.", {
+    redirectTo: emailRedirectTo,
+    next: "/company/setup",
+  });
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -143,10 +158,15 @@ export async function signUpCompanyAction(
         company_name: parsed.data.companyName,
         company_slug: parsed.data.companySlug,
       },
-      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=%2Fcompany%2Fsetup`,
+      emailRedirectTo,
     },
   });
 
+  console.log("[auth/signup:company] Résultat Supabase.", {
+    hasUser: Boolean(data.user),
+    hasSession: Boolean(data.session),
+    error: error ? { name: error.name, code: error.code, status: error.status, message: error.message } : null,
+  });
   if (error) return { error: publicAuthError(error.message) };
   if (!data.session) {
     return { message: "Compte créé. Confirmez votre e-mail, puis terminez la création de l’espace entreprise." };

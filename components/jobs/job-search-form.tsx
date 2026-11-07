@@ -63,7 +63,7 @@ export function JobSearchForm({
             </Button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="domain">Domaine</Label>
               <select className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" defaultValue={filters.domain} id="domain" name="domain">
@@ -96,6 +96,23 @@ export function JobSearchForm({
               <select className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" defaultValue={filters.experience} id="experience" name="experience">
                 <option value="">Tous les niveaux</option>
                 {experienceLevels.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="postedWithin">Date de publication</Label>
+              <select className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" defaultValue={filters.postedWithin} id="postedWithin" name="postedWithin">
+                <option value="">Toutes les dates</option>
+                <option value="day">Dernières 24 heures</option>
+                <option value="week">Cette semaine</option>
+                <option value="month">Ces 30 derniers jours</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sort">Trier par</Label>
+              <select className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" defaultValue={filters.sort} id="sort" name="sort">
+                <option value="newest">Plus récentes</option>
+                <option value="salary_desc">Salaire décroissant</option>
+                <option value="salary_asc">Salaire croissant</option>
               </select>
             </div>
           </div>
