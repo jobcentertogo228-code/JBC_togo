@@ -28,11 +28,35 @@ export default async function CompanyProfilePage() {
     );
   }
 
-  const { data: companies, error: companiesError } = await supabase
+  const extendedCompaniesResult = await supabase
     .from("companies")
-    .select("id, company_code, name, industry, description, phone, email, website_url, address, city, country_code, logo_path, is_verified")
+    .select("id, name, industry, description, city, country_code, logo_path, is_verified, company_code, phone, email, website_url, address")
     .in("id", companyIds)
     .order("name");
+
+  let companiesError = extendedCompaniesResult.error;
+  let companies = extendedCompaniesResult.data ?? [];
+
+  if (companiesError?.code === "42703") {
+    console.warn("[company/profile] Colonnes étendues indisponibles; chargement du profil minimal.", {
+      userId: user.id,
+      error: companiesError.message,
+    });
+    const fallback = await supabase
+      .from("companies")
+      .select("id, name, industry, description, city, country_code, logo_path, is_verified")
+      .in("id", companyIds)
+      .order("name");
+    companiesError = fallback.error;
+    companies = (fallback.data ?? []).map((company) => ({
+      ...company,
+      company_code: "",
+      phone: null,
+      email: null,
+      website_url: null,
+      address: null,
+    }));
+  }
 
   if (companiesError) throw new Error(`Impossible de charger les profils entreprise : ${companiesError.message}`);
   const roleByCompany = new Map((memberships ?? []).map((membership) => [membership.company_id, membership.role]));
