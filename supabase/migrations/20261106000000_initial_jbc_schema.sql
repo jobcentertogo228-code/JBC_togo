@@ -304,12 +304,27 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_account_role public.account_role;
 begin
-  insert into public.profiles (id, full_name)
+  v_account_role := case
+    when new.raw_user_meta_data ->> 'account_role' = 'company'
+      or (
+        nullif(pg_catalog.btrim(new.raw_user_meta_data ->> 'company_name'), '') is not null
+        and nullif(pg_catalog.btrim(new.raw_user_meta_data ->> 'company_slug'), '') is not null
+      )
+      then 'company'::public.account_role
+    else 'candidate'::public.account_role
+  end;
+
+  insert into public.profiles (id, account_role, full_name)
   values (
     new.id,
+    v_account_role,
     pg_catalog.left(coalesce(new.raw_user_meta_data ->> 'full_name', ''), 120)
   );
+
+  raise log 'Created profile for auth user %, role %', new.id, v_account_role;
   return new;
 end;
 $$;

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import type { AccountRole, Database } from "@/types/database";
 import { safeNextPath } from "@/lib/auth/redirects";
+import { companySetupSchema } from "@/lib/auth/schemas";
 import { createSupabaseActionClient } from "@/lib/supabase/server";
 
 const otpTypes = new Set(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
@@ -206,11 +207,109 @@ export async function GET(request: NextRequest) {
       return callbackError(message, request);
     }
 
+    console.info("[auth/callback] Profil chargé après confirmation.", {
+      requestId,
+      userId: userData.user.id,
+      role: profile.account_role,
+    });
+
     const isPasswordRecovery = next === "/reinitialiser-mot-de-passe" && (!type || type === "recovery");
-    const destination = isPasswordRecovery ? next : roleDestination(profile.account_role);
+    const companySetup = companySetupSchema.safeParse({
+      companyName: userData.user.user_metadata.company_name,
+      companySlug: userData.user.user_metadata.company_slug,
+    });
+    const isCompanySignup = profile.account_role === "company" || companySetup.success;
+    let destination: string;
+
+    if (isPasswordRecovery) {
+      destination = next;
+    } else if (isCompanySignup) {
+      const { data: membership, error: membershipError } = await supabase
+        .from("company_memberships")
+        .select("company_id, role, status")
+        .eq("profile_id", userData.user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+
+      if (membershipError) {
+        logCallbackError(requestId, "company_membership_lookup", membershipError);
+        return callbackError(membershipError.message, request);
+      }
+
+      console.info("[auth/callback] Vérification du membership entreprise.", {
+        requestId,
+        userId: userData.user.id,
+        membershipFound: Boolean(membership),
+        membershipRole: membership?.role ?? null,
+        membershipStatus: membership?.status ?? null,
+      });
+
+      if (membership) {
+        destination = "/company";
+      } else {
+        if (!companySetup.success) {
+          console.warn("[auth/callback] Métadonnées entreprise absentes ou invalides; redirection vers la configuration.", {
+            requestId,
+            userId: userData.user.id,
+          });
+          destination = "/company/setup";
+        } else {
+          console.info("[auth/callback] Création de l’entreprise à la confirmation.", {
+            requestId,
+            userId: userData.user.id,
+          });
+          const { data: companyId, error: companyError } = await supabase.rpc("create_company", {
+            p_name: companySetup.data.companyName,
+            p_slug: companySetup.data.companySlug,
+          });
+
+          console.info("[auth/callback] Résultat create_company.", {
+            requestId,
+            userId: userData.user.id,
+            companyId: companyId ?? null,
+            success: !companyError,
+            error: companyError ? errorDetails(companyError) : null,
+          });
+
+          if (companyError) {
+            logCallbackError(requestId, "create_company", companyError);
+            destination = "/company/setup?error=creation";
+          } else {
+            const { data: createdMembership, error: createdMembershipError } = await supabase
+              .from("company_memberships")
+              .select("company_id, role, status")
+              .eq("profile_id", userData.user.id)
+              .eq("company_id", companyId)
+              .eq("role", "owner")
+              .eq("status", "active")
+              .maybeSingle();
+
+            if (createdMembershipError || !createdMembership) {
+              const error = createdMembershipError ?? new Error("Le membership owner actif n’a pas été créé.");
+              logCallbackError(requestId, "company_membership_verification", error);
+              destination = "/company/setup?error=creation";
+            } else {
+              console.info("[auth/callback] Membership owner actif créé et vérifié.", {
+                requestId,
+                userId: userData.user.id,
+                companyId: createdMembership.company_id,
+                role: createdMembership.role,
+                status: createdMembership.status,
+              });
+              destination = "/company";
+            }
+          }
+        }
+      }
+    } else {
+      destination = roleDestination(profile.account_role);
+    }
+
     console.info("[auth/callback] Callback terminé.", {
       requestId,
-      role: profile.account_role,
+      userId: userData.user.id,
+      role: isCompanySignup ? "company" : profile.account_role,
       destination,
     });
 

@@ -60,7 +60,13 @@ async function authenticatedDestination() {
     return "/auth/erreur?type=profile";
   }
 
-  if (profile.account_role === "company") {
+  const companySetup = companySetupSchema.safeParse({
+    companyName: data.user.user_metadata.company_name,
+    companySlug: data.user.user_metadata.company_slug,
+  });
+  const isCompanySignup = profile.account_role === "company" || companySetup.success;
+
+  if (isCompanySignup) {
     const { data: membership, error: membershipError } = await supabase
       .from("company_memberships")
       .select("company_id")
@@ -73,9 +79,26 @@ async function authenticatedDestination() {
       return "/auth/erreur?type=membership";
     }
 
-    if (!membership) {
-      return "/company/setup";
+    if (membership) {
+      return "/company";
     }
+
+    if (companySetup.success) {
+      const { error: companyError } = await supabase.rpc("create_company", {
+        p_name: companySetup.data.companyName,
+        p_slug: companySetup.data.companySlug,
+      });
+
+      console.info("[auth/signin] Provisionnement du profil entreprise à la connexion.", {
+        userId: data.user.id,
+        success: !companyError,
+        error: companyError ? { code: companyError.code, message: companyError.message } : null,
+        destination: companyError ? "/company/setup?error=creation" : "/company",
+      });
+      return companyError ? "/company/setup?error=creation" : "/company";
+    }
+
+    return "/company/setup";
   }
 
   return roleDestination(profile.account_role);
@@ -118,7 +141,10 @@ export async function signUpCandidateAction(
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      data: { full_name: parsed.data.fullName },
+      data: {
+        full_name: parsed.data.fullName,
+        account_role: "candidate",
+      },
       emailRedirectTo,
     },
   });
@@ -157,17 +183,21 @@ export async function signUpCompanyAction(
         full_name: parsed.data.fullName,
         company_name: parsed.data.companyName,
         company_slug: parsed.data.companySlug,
+        account_role: "company",
       },
       emailRedirectTo,
     },
   });
 
   console.log("[auth/signup:company] Résultat Supabase.", {
+    userId: data.user?.id ?? null,
     hasUser: Boolean(data.user),
     hasSession: Boolean(data.session),
     error: error ? { name: error.name, code: error.code, status: error.status, message: error.message } : null,
   });
   if (error) return { error: publicAuthError(error.message) };
+  const user = data.user;
+  if (!user) return { error: "Le compte n’a pas pu être créé. Réessayez." };
   if (!data.session) {
     return { message: "Compte créé. Confirmez votre e-mail, puis terminez la création de l’espace entreprise." };
   }
@@ -177,10 +207,24 @@ export async function signUpCompanyAction(
     p_slug: parsed.data.companySlug,
   });
 
+  console.info("[auth/signup:company] Résultat de création de l’entreprise et du membership.", {
+    userId: user.id,
+    success: !companyError,
+    error: companyError ? { code: companyError.code, message: companyError.message } : null,
+  });
   if (companyError) {
+    console.error("[auth/signup:company] Échec de création de l’entreprise.", {
+      userId: user.id,
+      error: { code: companyError.code, message: companyError.message },
+      redirectTo: "/company/setup?error=creation",
+    });
     redirect("/company/setup?error=creation");
   }
 
+  console.info("[auth/signup:company] Redirection après création.", {
+    userId: user.id,
+    destination: "/company",
+  });
   redirect("/company");
 }
 

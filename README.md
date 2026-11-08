@@ -20,8 +20,8 @@ La clé `service_role` ne doit jamais être ajoutée aux variables `NEXT_PUBLIC_
 
 ## Parcours et autorisations
 
-- Les profils sont créés par le déclencheur `on_auth_user_created`; leur rôle initial est `candidate`.
-- L’inscription entreprise conserve le nom et le slug dans les métadonnées Auth jusqu’à la confirmation de l’adresse. `create_company` crée ensuite l’entreprise et son propriétaire dans une même transaction.
+- Les profils sont créés par le déclencheur `on_auth_user_created`; le rôle est lu dans les métadonnées Auth et limité à `candidate` ou `company` (les autres valeurs donnent `candidate`). Le rôle `admin` ne peut pas être défini à l’inscription.
+- L’inscription entreprise conserve le nom et le slug dans les métadonnées Auth jusqu’à la confirmation de l’adresse. Après confirmation, le callback appelle `create_company`, qui crée l’entreprise, son membership `owner` actif et confirme le rôle `company` dans une même transaction.
 - Les données de rôle sont relues côté serveur. Le middleware rafraîchit la session et redirige les accès incompatibles; les layouts vérifient également les rôles.
 - Les changements de rôle administrateur doivent être effectués par une opération de confiance (SQL opérateur ou backend avec la clé `service_role`). Aucun client ne peut s’octroyer le rôle administrateur.
 - Les invitations d’autres membres d’entreprise doivent être émises par un endpoint serveur de confiance; les clients ne disposent pas du droit d’insérer arbitrairement des appartenances.
