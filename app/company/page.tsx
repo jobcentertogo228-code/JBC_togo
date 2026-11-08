@@ -91,8 +91,18 @@ export default async function CompanyHomePage() {
       error: { code: unreadResult.error.code, message: unreadResult.error.message },
     });
   }
-  if (jobsResult.error) throw new Error(`Impossible de charger les offres récentes : ${jobsResult.error.message}`);
-  if (companiesResult.error) throw new Error(`Impossible de charger les entreprises : ${companiesResult.error.message}`);
+  if (jobsResult.error) {
+    console.error("[company/dashboard] Impossible de charger les offres récentes.", {
+      userId: user.id,
+      error: { code: jobsResult.error.code, message: jobsResult.error.message },
+    });
+  }
+  if (companiesResult.error) {
+    console.error("[company/dashboard] Impossible de charger les entreprises.", {
+      userId: user.id,
+      error: { code: companiesResult.error.code, message: companiesResult.error.message },
+    });
+  }
 
   const total = (key: "total_jobs" | "open_jobs" | "total_applications" | "interviews" | "hires") =>
     statsResults.reduce((sum, result) => sum + (result.data?.[0]?.[key] ?? 0), 0);
