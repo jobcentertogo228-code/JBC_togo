@@ -169,8 +169,13 @@ export async function GET(request: NextRequest) {
           const otpError = await verifyOtp(supabase, requestId, tokenHash, type);
           if (otpError) return callbackError(otpError, request);
         } else {
-          const message = error?.message
-            ?? "Supabase n’a pas créé de session après l’échange du code.";
+          const isMissingPkceVerifier = Boolean(
+            error?.message?.toLowerCase().includes("code verifier")
+            || error?.message?.toLowerCase().includes("pkce"),
+          );
+          const message = isMissingPkceVerifier
+            ? "La confirmation e-mail n’a pas pu être ouverte dans cette session. Rouvrez le lien dans le même navigateur dans lequel l’inscription a été créée, puis demandez un nouveau lien si nécessaire."
+            : error?.message ?? "Supabase n’a pas créé de session après l’échange du code.";
           logCallbackError(requestId, "exchangeCodeForSession", error ?? { message });
           return callbackError(message, request);
         }
