@@ -10,7 +10,12 @@ export default async function CompanyLayout({ children }: Readonly<{ children: R
     .eq("recipient_id", user.id)
     .is("read_at", null);
 
-  if (error) throw new Error(`Unable to count company notifications: ${error.message}`);
+  if (error) {
+    console.error("[company/layout] Impossible de compter les notifications.", {
+      userId: user.id,
+      error: { code: error.code, message: error.message },
+    });
+  }
 
   return (
     <NotificationRealtimeProvider initialUnreadCount={count ?? 0} userId={user.id}>

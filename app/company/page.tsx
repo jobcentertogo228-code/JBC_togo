@@ -64,13 +64,33 @@ export default async function CompanyHomePage() {
   ]);
 
   statsResults.forEach(({ error }) => {
-    if (error) throw new Error(`Impossible de charger les statistiques de recrutement : ${error.message}`);
+    if (error) {
+      console.error("[company/dashboard] Impossible de charger les statistiques de recrutement.", {
+        userId: user.id,
+        error: { code: error.code, message: error.message },
+      });
+    }
   });
   activityResults.forEach(({ error }) => {
-    if (error) throw new Error(`Impossible de charger l’activité de recrutement : ${error.message}`);
+    if (error) {
+      console.error("[company/dashboard] Impossible de charger l’activité de recrutement.", {
+        userId: user.id,
+        error: { code: error.code, message: error.message },
+      });
+    }
   });
-  if (notificationsResult.error) throw new Error(`Impossible de charger les notifications : ${notificationsResult.error.message}`);
-  if (unreadResult.error) throw new Error(`Impossible de compter les notifications : ${unreadResult.error.message}`);
+  if (notificationsResult.error) {
+    console.error("[company/dashboard] Impossible de charger les notifications.", {
+      userId: user.id,
+      error: { code: notificationsResult.error.code, message: notificationsResult.error.message },
+    });
+  }
+  if (unreadResult.error) {
+    console.error("[company/dashboard] Impossible de compter les notifications.", {
+      userId: user.id,
+      error: { code: unreadResult.error.code, message: unreadResult.error.message },
+    });
+  }
   if (jobsResult.error) throw new Error(`Impossible de charger les offres récentes : ${jobsResult.error.message}`);
   if (companiesResult.error) throw new Error(`Impossible de charger les entreprises : ${companiesResult.error.message}`);
 
