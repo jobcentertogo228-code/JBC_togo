@@ -35,6 +35,9 @@ function validationMessage(error: { issues: Array<{ message: string }> }) {
 }
 
 function publicAuthError(message: string) {
+  if (/company slug is already used|duplicate key value.*companies_slug_key/i.test(message)) {
+    return "Cet identifiant d’entreprise est déjà utilisé. Choisissez-en un autre.";
+  }
   if (/invalid login credentials/i.test(message)) {
     return "Adresse e-mail ou mot de passe incorrect.";
   }

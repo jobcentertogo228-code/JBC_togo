@@ -23,6 +23,7 @@ export function CompanySignUpForm() {
         <input
           autoComplete="off"
           name="companySlug"
+          maxLength={180}
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
           placeholder="exemple-entreprise"
           required

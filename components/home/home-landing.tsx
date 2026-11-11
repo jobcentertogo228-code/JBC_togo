@@ -411,7 +411,7 @@ export function HomeLanding() {
           </nav>
           <div className="hidden items-center gap-3 md:flex">
             <Link className="px-3 py-2 text-sm font-bold text-slate-700 transition hover:text-blue-700 dark:text-slate-200" href="/connexion">Connexion</Link>
-            <Link className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] dark:bg-white dark:text-slate-950 dark:hover:bg-blue-50" href="/inscription/candidat">
+            <Link className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] dark:bg-white dark:text-slate-950 dark:hover:bg-blue-50" href="/inscription">
               Créer un compte <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -427,7 +427,7 @@ export function HomeLanding() {
               <a className="rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800" href="#fonctionnement">Comment ça marche</a>
               <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
               <Link className="rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800" href="/connexion">Connexion</Link>
-              <Link className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white" href="/inscription/candidat">Créer un compte</Link>
+              <Link className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white" href="/inscription">Créer un compte</Link>
             </nav>
           </details>
         </div>
@@ -748,7 +748,7 @@ export function HomeLanding() {
             <div>
               <h2 className="text-sm font-bold text-slate-950 dark:text-white">Rejoignez le mouvement</h2>
               <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">Créez votre espace et donnez une nouvelle dimension à vos ambitions.</p>
-              <Link className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-700 transition hover:gap-3 dark:text-blue-300" href="/inscription/candidat">Commencer maintenant <ArrowRight className="h-4 w-4" /></Link>
+              <Link className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-700 transition hover:gap-3 dark:text-blue-300" href="/inscription">Commencer maintenant <ArrowRight className="h-4 w-4" /></Link>
             </div>
           </div>
           <div className="mt-10 flex flex-col justify-between gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:flex-row sm:items-center">

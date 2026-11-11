@@ -69,7 +69,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             ) : (
               <>
                 <Link className="hidden text-slate-600 sm:inline" href="/connexion">Connexion</Link>
-                <Button asChild size="sm"><Link href="/inscription/candidat">Créer un compte</Link></Button>
+                <Button asChild size="sm"><Link href="/inscription">Créer un compte</Link></Button>
               </>
             )}
           </nav>

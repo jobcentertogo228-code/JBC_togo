@@ -20,6 +20,7 @@ export const companySignUpSchema = candidateSignUpSchema.extend({
     .string()
     .trim()
     .toLowerCase()
+    .max(180, "L’identifiant de l’entreprise ne peut pas dépasser 180 caractères.")
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Utilisez un identifiant composé de lettres minuscules, chiffres et tirets."),
 });
 

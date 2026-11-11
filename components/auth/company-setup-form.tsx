@@ -25,6 +25,7 @@ export function CompanySetupForm({
         <input
           name="companySlug"
           defaultValue={initialSlug}
+          maxLength={180}
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
           required
         />
