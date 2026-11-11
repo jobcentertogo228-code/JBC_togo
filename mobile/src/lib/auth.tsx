@@ -27,6 +27,38 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function loadProfile(userId: string) {
+  const { data, error } = await getSupabase()
+    .from("profiles")
+    .select("id, account_role, full_name, phone, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const details = {
+    userId,
+    profileFound: Boolean(data),
+    accountRole: data?.account_role ?? null,
+    error: error
+      ? {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        }
+      : null,
+  };
+
+  if (error) {
+    console.error("[auth/profile] Échec de lecture du profil mobile.", details);
+  } else if (!data) {
+    console.warn("[auth/profile] Aucun profil trouvé pour l’utilisateur mobile authentifié.", details);
+  } else {
+    console.info("[auth/profile] Profil mobile trouvé.", details);
+  }
+
+  return { data, error };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -90,11 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileLoading(true);
     setProfileError(null);
     try {
-      const { data, error } = await getSupabase()
-        .from("profiles")
-        .select("id, account_role, full_name, phone, avatar_url")
-        .eq("id", session.user.id)
-        .maybeSingle();
+      const { data, error } = await loadProfile(session.user.id);
 
       if (error) {
         setProfileError(`Impossible de charger votre compte : ${error.message}`);
@@ -121,13 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     setProfileLoading(true);
     setProfileError(null);
-    void Promise.resolve(
-      getSupabase()
-        .from("profiles")
-        .select("id, account_role, full_name, phone, avatar_url")
-        .eq("id", session.user.id)
-        .maybeSingle(),
-    )
+    void loadProfile(session.user.id)
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {

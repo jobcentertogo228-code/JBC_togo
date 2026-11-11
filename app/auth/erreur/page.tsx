@@ -7,7 +7,7 @@ export default async function AuthErrorPage({
   const message = type === "callback" && callbackMessage?.trim()
     ? callbackMessage.trim().slice(0, 500)
     : type === "profile"
-    ? "Le profil associé à ce compte est indisponible. Vérifiez le déclencheur de création des profils dans Supabase."
+    ? "Le profil associé à ce compte n’a pas pu être chargé. Vérifiez les journaux serveur pour distinguer un profil absent d’un refus d’accès Supabase."
     : type === "membership"
       ? "L’appartenance à l’entreprise n’a pas pu être vérifiée. Réessayez ou contactez l’assistance."
       : type === "callback"

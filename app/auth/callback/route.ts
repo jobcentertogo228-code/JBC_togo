@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { AccountRole, Database } from "@/types/database";
 import { safeNextPath } from "@/lib/auth/redirects";
 import { companySetupSchema } from "@/lib/auth/schemas";
+import { lookupProfileForUser } from "@/lib/auth/profile";
 import { createSupabaseActionClient } from "@/lib/supabase/server";
 
 const otpTypes = new Set(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
@@ -196,11 +197,11 @@ export async function GET(request: NextRequest) {
       return callbackError(message, request);
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("account_role")
-      .eq("id", userData.user.id)
-      .maybeSingle();
+    const { profile, error: profileError } = await lookupProfileForUser(
+      supabase,
+      userData.user,
+      "auth/callback",
+    );
 
     if (profileError) {
       logCallbackError(requestId, "profile", profileError);

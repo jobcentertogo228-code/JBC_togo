@@ -1,13 +1,10 @@
 import { redirect } from "next/navigation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { lookupProfileForUser, type AuthenticatedProfile } from "@/lib/auth/profile";
 import type { AccountRole, Database } from "@/types/database";
 
-export type AuthenticatedProfile = {
-  id: string;
-  account_role: AccountRole;
-  full_name: string;
-};
+export type { AuthenticatedProfile } from "@/lib/auth/profile";
 
 export function roleHome(role: AccountRole) {
   switch (role) {
@@ -24,17 +21,13 @@ export async function getProfileForUser(
   supabase: SupabaseClient<Database>,
   user: User,
 ) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, account_role, full_name")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { profile, error } = await lookupProfileForUser(supabase, user, "server");
 
   if (error) {
     throw new Error(`Unable to load authenticated profile: ${error.message}`);
   }
 
-  return data as AuthenticatedProfile | null;
+  return profile as AuthenticatedProfile | null;
 }
 
 export async function requireUser() {

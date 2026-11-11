@@ -4,24 +4,20 @@ import { requireRole } from "@/lib/auth/roles";
 
 export default async function CandidateLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { supabase, user, profile } = await requireRole("candidate");
-  const [accountResult, notificationsResult] = await Promise.all([
-    supabase.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle(),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("recipient_id", user.id)
-      .is("read_at", null),
-  ]);
+  const { count, error: notificationsError } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_id", user.id)
+    .is("read_at", null);
 
-  if (accountResult.error) throw new Error(`Unable to load candidate account: ${accountResult.error.message}`);
-  if (notificationsResult.error) {
-    throw new Error(`Unable to count candidate notifications: ${notificationsResult.error.message}`);
+  if (notificationsError) {
+    throw new Error(`Unable to count candidate notifications: ${notificationsError.message}`);
   }
 
   return (
-    <NotificationRealtimeProvider initialUnreadCount={notificationsResult.count ?? 0} userId={user.id}>
+    <NotificationRealtimeProvider initialUnreadCount={count ?? 0} userId={user.id}>
       <CandidateShell
-        avatarUrl={accountResult.data?.avatar_url ?? null}
+        avatarUrl={profile.avatar_url}
         email={user.email ?? ""}
         name={profile.full_name || "Candidat"}
       >

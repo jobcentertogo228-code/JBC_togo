@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { AccountRole, Database } from "@/types/database";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { lookupProfileForUser } from "@/lib/auth/profile";
 import { roleDestination } from "@/lib/auth/redirects";
 
 const protectedPrefixes = ["/candidate", "/company", "/admin"];
@@ -48,11 +49,11 @@ export async function middleware(request: NextRequest) {
       return copyCookies(response, NextResponse.redirect(target));
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("account_role")
-      .eq("id", authData.user.id)
-      .maybeSingle();
+    const { profile, error: profileError } = await lookupProfileForUser(
+      supabase,
+      authData.user,
+      "middleware/protected",
+    );
 
     if (profileError || !profile) {
       const target = new URL("/auth/erreur", request.url);
@@ -114,11 +115,11 @@ export async function middleware(request: NextRequest) {
       return copyCookies(response, NextResponse.redirect(new URL(roleDestination(role), request.url)));
     }
   } else if (authData.user && accountPages.some((page) => isPathUnder(pathname, page))) {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("account_role")
-      .eq("id", authData.user.id)
-      .maybeSingle();
+    const { profile, error } = await lookupProfileForUser(
+      supabase,
+      authData.user,
+      "middleware/account-page",
+    );
 
     if (error || !profile) {
       const target = new URL("/auth/erreur", request.url);
