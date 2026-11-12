@@ -6,15 +6,14 @@ import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { getCandidateAvatarUrl } from "@/lib/candidate/avatar";
-import { getCandidateRecord } from "@/lib/candidate/queries";
 import { requireRole } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Mon profil candidat" };
 
 export default async function CandidateProfilePage() {
   const { supabase, user, profile } = await requireRole("candidate");
-  const [candidate, profileDetails, skillsResult, selectedSkillsResult, languagesResult, educationResult, experiencesResult, resumesResult] = await Promise.all([
-    getCandidateRecord(supabase, user.id),
+  const [candidateResult, profileDetails, skillsResult, selectedSkillsResult, languagesResult, educationResult, experiencesResult, resumesResult] = await Promise.all([
+    supabase.from("candidates").select("*").eq("profile_id", user.id).maybeSingle(),
     supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle(),
     supabase.from("skills").select("id, name, category").order("name").limit(100),
     supabase.from("candidate_skills").select("skill_id, proficiency").eq("candidate_id", user.id),
@@ -24,13 +23,31 @@ export default async function CandidateProfilePage() {
     supabase.from("resumes").select("id", { count: "exact", head: true }).eq("candidate_id", user.id),
   ]);
 
-  if (profileDetails.error) throw new Error(`Unable to load candidate contact details: ${profileDetails.error.message}`);
-  if (skillsResult.error) throw new Error(`Unable to load skills catalog: ${skillsResult.error.message}`);
-  if (selectedSkillsResult.error) throw new Error(`Unable to load selected skills: ${selectedSkillsResult.error.message}`);
-  if (languagesResult.error) throw new Error(`Unable to load candidate languages: ${languagesResult.error.message}`);
-  if (educationResult.error) throw new Error(`Unable to load candidate education: ${educationResult.error.message}`);
-  if (experiencesResult.error) throw new Error(`Unable to load candidate experience: ${experiencesResult.error.message}`);
-  if (resumesResult.error) throw new Error(`Unable to count candidate resumes: ${resumesResult.error.message}`);
+  const candidate = candidateResult.data;
+  const queryFailures = [
+    { query: "candidates", error: candidateResult.error },
+    { query: "profiles.phone", error: profileDetails.error },
+    { query: "skills", error: skillsResult.error },
+    { query: "candidate_skills", error: selectedSkillsResult.error },
+    { query: "candidate_languages", error: languagesResult.error },
+    { query: "education", error: educationResult.error },
+    { query: "experiences", error: experiencesResult.error },
+    { query: "resumes count", error: resumesResult.error },
+  ].filter((failure) => failure.error);
+
+  for (const { query, error } of queryFailures) {
+    console.error("[candidate/profile] Supabase query failed", {
+      userId: user.id,
+      role: profile.account_role,
+      query,
+      error: {
+        code: error?.code,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+      },
+    });
+  }
 
   const nameParts = profile.full_name.trim().split(/\s+/).filter(Boolean);
   const firstName = candidate?.first_name ?? nameParts[0] ?? "";
@@ -63,6 +80,11 @@ export default async function CandidateProfilePage() {
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Mon profil</h1>
         <p className="mt-2 text-muted-foreground">Présentez clairement votre parcours et vos compétences aux recruteurs.</p>
       </div>
+      {queryFailures.length > 0 && (
+        <Alert variant="warning">
+          Certaines données du profil sont temporairement indisponibles. Les informations chargées restent consultables et modifiables.
+        </Alert>
+      )}
       {!candidate && (
         <Alert variant="info">
           Votre profil professionnel sera créé lors de l’enregistrement de vos informations.

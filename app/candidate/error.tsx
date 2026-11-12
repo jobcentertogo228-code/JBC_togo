@@ -1,15 +1,21 @@
 "use client";
 
+import { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function CandidateError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error("[candidate/error] Unhandled route error", error);
+  }, [error]);
+
   return (
     <Card>
       <CardContent className="flex flex-col items-center px-6 py-12 text-center">

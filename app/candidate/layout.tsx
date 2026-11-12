@@ -11,7 +11,17 @@ export default async function CandidateLayout({ children }: Readonly<{ children:
     .is("read_at", null);
 
   if (notificationsError) {
-    throw new Error(`Unable to count candidate notifications: ${notificationsError.message}`);
+    console.error("[candidate/layout] Supabase query failed", {
+      userId: user.id,
+      role: profile.account_role,
+      query: "notifications unread count",
+      error: {
+        code: notificationsError.code,
+        message: notificationsError.message,
+        details: notificationsError.details,
+        hint: notificationsError.hint,
+      },
+    });
   }
 
   return (

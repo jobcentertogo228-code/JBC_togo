@@ -20,14 +20,31 @@ export default async function CandidateResumesPage() {
     .eq("candidate_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error(`Unable to load resumes: ${error.message}`);
+  if (error) {
+    console.error("[candidate/cv] Supabase query failed", {
+      userId: user.id,
+      role: "candidate",
+      query: "resumes",
+      error: { code: error.code, message: error.message, details: error.details, hint: error.hint },
+    });
+  }
 
   const resumeCards = await Promise.all((resumes ?? []).map(async (resume) => {
     const { data, error: signedUrlError } = await supabase.storage
       .from("candidate-resumes")
       .createSignedUrl(resume.storage_path, 300);
-    if (signedUrlError) throw new Error(`Unable to create resume download link: ${signedUrlError.message}`);
-    return { ...resume, signedUrl: data.signedUrl };
+    if (signedUrlError) {
+      console.error("[candidate/cv] Unable to create resume download link", {
+        userId: user.id,
+        role: "candidate",
+        resumeId: resume.id,
+        error: {
+          statusCode: signedUrlError.statusCode,
+          message: signedUrlError.message,
+        },
+      });
+    }
+    return { ...resume, signedUrl: data?.signedUrl ?? null };
   }));
   const hasDefault = (resumes ?? []).some((resume) => resume.is_default);
 
@@ -52,10 +69,16 @@ export default async function CandidateResumesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Documents enregistrés</CardTitle>
-          <CardDescription>{resumeCards.length} CV{resumeCards.length > 1 ? " enregistrés" : " enregistré"}</CardDescription>
+          <CardDescription>
+            {error
+              ? "La liste de vos CV n’a pas pu être chargée."
+              : `${resumeCards.length} CV${resumeCards.length > 1 ? " enregistrés" : " enregistré"}`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {resumeCards.length ? (
+          {error ? (
+            <Alert variant="warning">La liste de vos CV est indisponible pour le moment. Vous pouvez tout de même en ajouter un nouveau.</Alert>
+          ) : resumeCards.length ? (
             <div className="divide-y divide-border">
               {resumeCards.map((resume) => (
                 <div className="flex items-center gap-3 py-4 first:pt-0 last:pb-0" key={resume.id}>
@@ -70,17 +93,21 @@ export default async function CandidateResumesPage() {
                   {resume.is_default && <Badge className="hidden sm:inline-flex" variant="success"><Star className="mr-1 h-3 w-3" />CV principal</Badge>}
                   {!resume.is_default && <DefaultResumeForm resumeId={resume.id} />}
                   <ResumeReplace candidateId={user.id} oldStoragePath={resume.storage_path} resumeId={resume.id} />
-                  <a
-                    aria-label={`Télécharger ${resume.title}`}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-primary"
-                    href={resume.signedUrl}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    <Download aria-hidden="true" className="h-4 w-4" />
-                  </a>
+                  {resume.signedUrl ? (
+                    <a
+                      aria-label={`Télécharger ${resume.title}`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-primary"
+                      href={resume.signedUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <Download aria-hidden="true" className="h-4 w-4" />
+                    </a>
+                  ) : (
+                    <span className="text-xs text-warning-foreground">Téléchargement indisponible</span>
+                  )}
                   <ResumeDeleteForm resumeId={resume.id} />
-                  {resume.mime_type === "application/pdf" && (
+                  {resume.signedUrl && resume.mime_type === "application/pdf" && (
                     <details className="basis-full rounded-lg border border-border p-3">
                       <summary className="cursor-pointer text-sm font-medium">Prévisualiser le PDF</summary>
                       <object

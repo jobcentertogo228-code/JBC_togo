@@ -28,6 +28,15 @@ export async function getCandidateAvatarUrl(
   const { data, error } = await supabase.storage
     .from("candidate-avatars")
     .createSignedUrl(path, 300);
-  if (error) throw new Error(`Impossible de créer le lien sécurisé de la photo : ${error.message}`);
+  if (error) {
+    console.error("[candidate/avatar] Unable to create signed avatar URL", {
+      userId: candidateId,
+      error: {
+        message: error.message,
+        statusCode: error.statusCode,
+      },
+    });
+    return null;
+  }
   return data.signedUrl;
 }

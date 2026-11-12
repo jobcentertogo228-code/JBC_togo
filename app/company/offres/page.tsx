@@ -18,11 +18,23 @@ export default async function CompanyJobsPage() {
     .select("company_id, role")
     .eq("profile_id", user.id)
     .eq("status", "active");
-  if (membershipsError) throw new Error(`Impossible de charger vos entreprises : ${membershipsError.message}`);
+  if (membershipsError) {
+    console.error("[company/offres] Supabase query failed", {
+      userId: user.id,
+      role: "company",
+      query: "company_memberships",
+      error: {
+        code: membershipsError.code,
+        message: membershipsError.message,
+        details: membershipsError.details,
+        hint: membershipsError.hint,
+      },
+    });
+  }
 
   const companyIds = [...new Set((memberships ?? []).map((membership) => membership.company_id))];
   const [jobsResult, companiesResult] = await Promise.all([
-    companyIds.length
+    companyIds.length && !membershipsError
       ? supabase
         .from("jobs")
         .select("id, reference_code, company_id, title, slug, status, published_at, closes_at, created_at")
@@ -30,12 +42,25 @@ export default async function CompanyJobsPage() {
         .order("created_at", { ascending: false })
         .limit(200)
       : Promise.resolve({ data: [], error: null }),
-    companyIds.length
+    companyIds.length && !membershipsError
       ? supabase.from("companies").select("id, name").in("id", companyIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
-  if (jobsResult.error) throw new Error(`Impossible de charger vos offres : ${jobsResult.error.message}`);
-  if (companiesResult.error) throw new Error(`Impossible de charger les entreprises : ${companiesResult.error.message}`);
+  for (const [query, error] of [
+    ["jobs", jobsResult.error],
+    ["companies", companiesResult.error],
+  ] as const) {
+    if (error) {
+      console.error("[company/offres] Supabase query failed", {
+        userId: user.id,
+        role: "company",
+        companyIds,
+        query,
+        error: { code: error.code, message: error.message, details: error.details, hint: error.hint },
+      });
+    }
+  }
+  const loadError = membershipsError ?? jobsResult.error ?? companiesResult.error;
 
   const names = new Map((companiesResult.data ?? []).map((company) => [company.id, company.name]));
   const roles = new Map((memberships ?? []).map((membership) => [membership.company_id, membership.role]));
@@ -54,10 +79,16 @@ export default async function CompanyJobsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Vos annonces</CardTitle>
-          <CardDescription>{jobsResult.data?.length ?? 0} offre{jobsResult.data?.length === 1 ? "" : "s"} affichée{jobsResult.data?.length === 1 ? "" : "s"} (200 maximum).</CardDescription>
+          <CardDescription>
+            {loadError
+              ? "Les données des offres ne sont pas disponibles pour le moment."
+              : `${jobsResult.data?.length ?? 0} offre${jobsResult.data?.length === 1 ? "" : "s"} affichée${jobsResult.data?.length === 1 ? "" : "s"} (200 maximum).`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {jobsResult.data?.length ? (
+          {loadError ? (
+            <Alert variant="warning">Impossible de charger les offres pour le moment. Réessayez en actualisant la page.</Alert>
+          ) : jobsResult.data?.length ? (
             <div className="space-y-3">
               {jobsResult.data.map((job) => {
                 const canManage = ["owner", "admin", "recruiter"].includes(roles.get(job.company_id) ?? "");
