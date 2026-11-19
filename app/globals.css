@@ -10,7 +10,7 @@
   --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --primary: 224 76% 48%;
+  --primary: 221 83% 53%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 40% 96%;
   --secondary-foreground: 222 47% 11%;
@@ -22,7 +22,7 @@
   --destructive-foreground: 0 0% 100%;
   --border: 214 32% 91%;
   --input: 214 32% 91%;
-  --ring: 224 76% 48%;
+  --ring: 221 83% 53%;
   --radius: 0.75rem;
   --surface: 0 0% 100%;
   --info: 214 95% 93%;
@@ -89,7 +89,7 @@ body {
 }
 
 a {
-  color: #1d4ed8;
+  color: #2563eb;
   text-decoration: none;
 }
 
@@ -117,7 +117,7 @@ input {
 }
 
 .brand {
-  color: #172033;
+  color: #1e40af;
   font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -190,7 +190,7 @@ input {
   padding: 0.7rem 1rem;
   border: 0;
   border-radius: 8px;
-  background: #1d4ed8;
+  background: #2563eb;
   color: #fff;
   cursor: pointer;
   font-weight: 700;
@@ -251,6 +251,50 @@ input {
   font-size: 0.9rem;
 }
 
+.pwa-install {
+  position: fixed;
+  z-index: 50;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  display: flex;
+  width: min(100% - 2rem, 480px);
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0 auto;
+  padding: 1rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  background: hsl(var(--surface));
+  box-shadow: 0 12px 35px rgb(15 23 42 / 16%);
+}
+
+.pwa-install-copy {
+  display: grid;
+  flex: 1;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.pwa-install-copy span {
+  color: hsl(var(--muted-foreground));
+}
+
+.pwa-install-button {
+  flex-shrink: 0;
+  background: #2563eb;
+}
+
+.pwa-dismiss {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
 @media (max-width: 640px) {
   .site-header {
     align-items: flex-start;
@@ -260,5 +304,14 @@ input {
 
   .auth-card {
     padding: 1.4rem;
+  }
+
+  .pwa-install {
+    gap: 0.5rem;
+    padding: 0.85rem;
+  }
+
+  .pwa-install-button {
+    padding: 0.65rem 0.8rem;
   }
 }

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # JOB-CENTER — Authentification
 
 ## Installation
@@ -64,6 +63,14 @@ Appliquer toutes les migrations, y compris les migrations `candidate_*` ajoutée
 
 ## Déploiement web en production (GitHub + Vercel)
 
+### Application web installable (PWA)
+
+- Le site est installable sous Android Chrome, Samsung Internet et Edge Mobile; Safari sur iPhone/iPad propose l’ajout manuel à l’écran d’accueil. La bannière « Installer Job Center » déclenche l’invite native quand le navigateur l’autorise et affiche sinon les instructions adaptées.
+- `public/manifest.json` définit le nom, les couleurs, l’affichage autonome, les raccourcis et les icônes. Les icônes PNG et les écrans de démarrage Apple se trouvent sous `public/icons/`.
+- En production, le service worker `public/sw.js` est généré par `@ducanh2912/next-pwa` pendant `npm run build`; il est volontairement désactivé en développement local. Vercel sert les fichiers statiques générés comme les autres assets Next.js.
+- Hors ligne, une page de secours s’affiche. Seuls les assets statiques versionnés Next.js sont mis en cache; les navigations, les routes protégées, les appels Supabase et les données de compte ne sont pas mis en cache. Les formulaires et tableaux de bord nécessitent donc une connexion.
+- Pour tester l’installation, déployez en HTTPS (ou utilisez localhost sur un appareil de développement), ouvrez le site dans un navigateur compatible puis choisissez **Installer l’application** ou **Ajouter à l’écran d’accueil**. Sur iPhone/iPad : Safari → **Partager** → **Sur l’écran d’accueil**. Le service worker de production ne s’active pas avec `npm run dev`.
+
 ### Contrôles locaux
 
 ```powershell
@@ -96,7 +103,7 @@ Une CI GitHub s’exécute sur les pull requests et les branches `main`/`master`
 
 1. Importez le dépôt GitHub dans Vercel, sélectionnez **Next.js** et définissez **Root Directory** sur `.` (la racine).
 2. Gardez les commandes détectées automatiquement ou configurez **Install Command** `npm ci` et **Build Command** `npm run build`. Laissez **Output Directory** vide pour le runtime Next.js.
-3. Ajoutez les variables ci-dessous aux environnements Production, Preview et Development selon les indications. Les deux variables Supabase sont des valeurs publiques destinées au client; ne fournissez jamais une clé `service_role`.
+3. Ajoutez les variables ci-dessous dans les environnements Vercel concernés. `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` sont nécessaires en Production (et Preview si ces déploiements utilisent Supabase). La clé `service_role` n'est pas utilisée par l'application web et ne doit jamais être exposée au navigateur.
 4. Déployez. Notez le domaine `https://<projet>.vercel.app`, puis configurez-le dans Supabase Auth et comme URL de production ci-dessous.
 
 Vérifiez les conditions d’utilisation du plan Vercel choisi : le plan Hobby est destiné aux projets personnels/non commerciaux. Une plateforme de recrutement opérée comme SaaS commercial peut nécessiter un plan payant.
@@ -106,6 +113,9 @@ Vérifiez les conditions d’utilisation du plan Vercel choisi : le plan Hobby e
 | `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase | Même projet ou projet de test | Valeur de `.env.local` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clé `anon`/publishable du projet | Clé correspondante | Valeur de `.env.local` |
 | `NEXT_PUBLIC_SITE_URL` | `https://<projet>.vercel.app` | Facultative : Vercel `VERCEL_URL` est utilisée automatiquement | `http://localhost:3000` dans `.env.local` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Non requise par l'application actuelle | Non requise | Ne pas définir sauf ajout futur d'un client serveur privilégié |
+
+Ajoutez les deux variables Supabase avec leur nom exact dans **Vercel → Project → Settings → Environment Variables**, en sélectionnant **Production** (et **Preview** si nécessaire), puis redéployez. Une variable ajoutée après un déploiement n'est pas injectée rétroactivement dans celui-ci. Les variables publiques doivent être disponibles au moment du build; l'application les valide avant de créer un client Supabase et échoue avec le nom exact de la variable manquante.
 
 `NEXT_PUBLIC_SITE_URL` sert à construire les métadonnées et les liens de confirmation/réinitialisation. Pour les Preview Deployments, le code utilise le domaine système `VERCEL_URL` lorsqu’aucune URL explicite n’est configurée.
 
@@ -118,6 +128,3 @@ Vérifiez les conditions d’utilisation du plan Vercel choisi : le plan Hobby e
 5. Vérifiez dans le Dashboard Supabase que RLS est activé pour les tables métier, que `candidate-resumes` est privé et que la publication `supabase_realtime` contient `notifications`. Les migrations présentes dans le dépôt décrivent ces réglages; elles ne certifient pas à elles seules l’état actuel d’un autre projet Supabase.
 
 La configuration Supabase locale utilise actuellement `http://localhost:3000`. Son Site URL et ses Redirect URLs doivent être remplacés/complétés pour la production; ne modifiez pas `.env.local` pour publier des secrets dans Git.
-=======
-# JBC_togo
->>>>>>> b09620c8371bb1ca7e86e8ed56ea4879df802c8e

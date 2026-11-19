@@ -3,6 +3,10 @@ node_modules/
 .vercel/
 out/
 coverage/
+public/sw.js
+public/workbox-*.js
+public/fallback-*.js
+.idea/
 *.tsbuildinfo
 .env*
 !.env.example
